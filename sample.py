@@ -2,11 +2,13 @@
 
 import cgi
 import logging
+import urllib
 import urllib2
 
 from django.utils import simplejson
 
 from google.appengine.api import users
+from google.appengine.api import xmpp
 from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
@@ -60,16 +62,16 @@ class ReceiveCheckin(webapp.RequestHandler):
     url = 'http://partychat-hooks.appspot.com/post/p_mgfhm2u3'
     checkin_url = 'http://foursquare.com/user/%s/checkin/%s' % (user_json['id'], checkin_json['id'])
     if checkin_json['type'] == 'shout':
-      message = '%s: %s shouted %s' % (checkin_url, user_json['firstName'], checkin_json['shout'])
+      message = u'%s: %s shouted %s' % (checkin_url, user_json['firstName'], checkin_json['shout'])
     elif checkin_json.get('shout'):
-      message = '%s: %s checked in at %s: %s' % (checkin_url, user_json['firstName'],
+      message = u'%s: %s checked in at %s: %s' % (checkin_url, user_json['firstName'],
                                              checkin_json['venue']['name'],
                                              checkin_json['shout'])
     else:
-      message = '%s: %s checked in at %s' % (checkin_url, user_json['firstName'],
+      message = u'%s: %s checked in at %s.' % (checkin_url, user_json['firstName'],
                                          checkin_json['venue']['name'])
     logging.info('posting to %s with %s' % (url, message))
-    urllib2.urlopen(url, "message=%s" % message).read()
+    urllib2.urlopen(url, "message=%s" %  urllib.quote_plus(utf8(message)).read()
 
 class GetConfig(webapp.RequestHandler):
   def get(self):
