@@ -24,12 +24,19 @@ class UserToken(db.Model):
   user = db.UserProperty()
   fs_id = db.StringProperty()
   token = db.StringProperty()
+  twitter = db.StringProperty()
 
 def fetchJson(url):
   logging.info('fetching url: ' + url)
   result = urllib2.urlopen(url).read()
   logging.info('got back: ' + result)
   return simplejson.loads(result)
+
+def utf8(value):
+  if isinstance(value, unicode):
+    return value.encode("utf-8")
+  assert isinstance(value, str)
+  return value
 
 class OAuth(webapp.RequestHandler):
   def post(self):
@@ -49,18 +56,40 @@ class OAuth(webapp.RequestHandler):
 
     self_response = fetchJson('%s/v2/users/self?oauth_token=%s' % (config['api_server'], token.token))
 
-    token.fs_id = self_response['response']['user']['id']
+    user_json = self_response['response']['user']
+    token.fs_id = user_json['id']
+    if user_json['contact'].get('twitter'):
+      token.twitter = user_json['contact']['twitter']
     token.put()
 
     self.redirect("/")
+
+def postToPartychat(message):
+  url = 'http://partychat-hooks.appspot.com/post/p_mgfhm2u3'
+  logging.info('posting to %s with %s' % (url, message))
+  urllib2.urlopen(url, "message=%s" % urllib.quote_plus(utf8(message))).read()
 
 class ReceiveCheckin(webapp.RequestHandler):
   def post(self):
     json = simplejson.loads(self.request.body)
     checkin_json = json['checkin']
     user_json = json['user']
-    url = 'http://partychat-hooks.appspot.com/post/p_mgfhm2u3'
-    checkin_url = 'http://foursquare.com/user/%s/checkin/%s' % (user_json['id'], checkin_json['id'])
+
+    token = UserToken.all().filter('fs_id =',user_json['id']).get()
+    logging.info(token)
+    if token and not token.twitter:
+      self_response = fetchJson('%s/v2/users/self?oauth_token=%s' % (config['api_server'], token.token))
+      user_json = self_response['response']['user']
+      if user_json['contact'].get('twitter'):
+        token.twitter = user_json['contact']['twitter']
+        token.put()
+
+    if token and token.twitter:
+      userpath = token.twitter
+    else:
+      userpath = 'user/%s' % user_json['id']
+
+    checkin_url = 'http://foursquare.com/%s/checkin/%s' % (userpath, checkin_json['id'])
     if checkin_json['type'] == 'shout':
       message = u'%s: %s shouted %s' % (checkin_url, user_json['firstName'], checkin_json['shout'])
     elif checkin_json.get('shout'):
@@ -70,8 +99,9 @@ class ReceiveCheckin(webapp.RequestHandler):
     else:
       message = u'%s: %s checked in at %s.' % (checkin_url, user_json['firstName'],
                                          checkin_json['venue']['name'])
-    logging.info('posting to %s with %s' % (url, message))
-    urllib2.urlopen(url, "message=%s" %  urllib.quote_plus(utf8(message)).read()
+    logging.info("posting %s" % message)
+    postToPartychat(message)
+
 
 class GetConfig(webapp.RequestHandler):
   def get(self):
