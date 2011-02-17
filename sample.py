@@ -97,15 +97,18 @@ class ReceiveCheckin(webapp.RequestHandler):
     checkin_url = 'http://foursquare.com/%s/checkin/%s' % (userpath, checkin_json['id'])
     if checkin_json['type'] == 'shout':
       message = u'%s: %s shouted %s' % (checkin_url, user_json['firstName'], checkin_json['shout'])
-    elif checkin_json.get('shout') and shouldSend(checkin_json['venue']):
+    elif checkin_json.get('shout'):
       message = u'%s: %s checked in at %s: %s' % (checkin_url, user_json['firstName'],
                                              checkin_json['venue']['name'],
                                              checkin_json['shout'])
-    elif shouldSend(checkin_json['venue']):
+    else:
       message = u'%s: %s checked in at %s.' % (checkin_url, user_json['firstName'],
                                          checkin_json['venue']['name'])
-    logging.info("posting %s" % message)
-    postToPartychat(message)
+    if (not checkin_json.get('venue')) or shouldSend(checkin_json['venue']):
+      logging.info("posting %s" % message)
+      postToPartychat(message)
+    else:
+      logging.info("not posting checkin")
 
 
 class GetConfig(webapp.RequestHandler):
