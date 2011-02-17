@@ -69,8 +69,13 @@ def postToPartychat(message):
   logging.info('posting to %s with %s' % (url, message))
   urllib2.urlopen(url, "message=%s" % urllib.quote_plus(utf8(message))).read()
 
+def shouldSend(venue):
+  return venue['id'] != '4ab7e57cf964a5205f7b20e3'
+
 class ReceiveCheckin(webapp.RequestHandler):
   def post(self):
+    logging.info('input = ' + self.request.body)
+
     json = simplejson.loads(self.request.body)
     checkin_json = json['checkin']
     user_json = json['user']
@@ -92,11 +97,11 @@ class ReceiveCheckin(webapp.RequestHandler):
     checkin_url = 'http://foursquare.com/%s/checkin/%s' % (userpath, checkin_json['id'])
     if checkin_json['type'] == 'shout':
       message = u'%s: %s shouted %s' % (checkin_url, user_json['firstName'], checkin_json['shout'])
-    elif checkin_json.get('shout'):
+    elif checkin_json.get('shout') and shouldSend(checkin_json['venue']):
       message = u'%s: %s checked in at %s: %s' % (checkin_url, user_json['firstName'],
                                              checkin_json['venue']['name'],
                                              checkin_json['shout'])
-    else:
+    elif shouldSend(checkin_json['venue']):
       message = u'%s: %s checked in at %s.' % (checkin_url, user_json['firstName'],
                                          checkin_json['venue']['name'])
     logging.info("posting %s" % message)
